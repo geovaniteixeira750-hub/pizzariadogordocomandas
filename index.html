@@ -148,6 +148,12 @@ header{background:#fff;border-bottom:3px solid var(--red);box-shadow:0 2px 14px 
 .sz-prev strong{font-family:"Bebas Neue";font-size:1.3rem;color:var(--red)}
 .btn-add-sz{width:100%;border:0;border-radius:6px;background:var(--green);color:#fff;padding:13px;font-size:.82rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
 .btn-add-sz:disabled{opacity:.45;cursor:not-allowed}
+.meio-toggle{background:#d4a01714;border:1.5px solid #d4a0174d;border-radius:10px;padding:13px;margin-bottom:14px}
+.meio-check{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:.8rem;font-weight:700}
+.meio-check input{width:17px;height:17px;accent-color:var(--green);cursor:pointer}
+.meio-check i{color:var(--gold)}
+.meio-second{margin-top:11px}
+.meio-second select{cursor:pointer}
 
 /* ---------- Toast ---------- */
 .toast{position:fixed;left:50%;bottom:26px;z-index:500;transform:translateX(-50%) translateY(16px);opacity:0;pointer-events:none;background:var(--green);color:#fff;border-radius:8px;padding:11px 22px;font-size:.85rem;font-weight:700;display:flex;align-items:center;gap:7px;box-shadow:0 8px 22px #0003;transition:.25s}
@@ -226,6 +232,13 @@ header{background:#fff;border-bottom:3px solid var(--red);box-shadow:0 2px 14px 
       <button class="mod-x" onclick="closeSzModal()" type="button"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="sz-bd">
+      <div class="meio-toggle">
+        <label class="meio-check"><input type="checkbox" id="meio-toggle-chk"><span><i class="fa-solid fa-circle-half-stroke"></i> Fazer meio a meio (2 sabores)</span></label>
+        <div class="meio-second" id="meio-second-wrap" style="display:none">
+          <span class="fl-lbl">2ª metade <span class="req">*</span></span>
+          <select class="fl-inp" id="meio-second-select"></select>
+        </div>
+      </div>
       <div class="size-grid" id="size-grid"></div>
       <div class="borda-sec">
         <div class="borda-title"><i class="fa-solid fa-circle-plus"></i> Borda Recheada (+R$ 5,00)</div>
@@ -253,6 +266,7 @@ const doces=[["Abacaxi","Mussarela, abacaxi, mel e canela"],["Banana","Mussarela
 const drinks=[{cat:"Refrigerantes",ic:"fa-bottle-water",cor:"var(--red)",items:[["Fanta Laranja 2L",15],["Refrigerante Lata",6],["Refrigerante 1L",10],["Guaraná 2L",15],["Coca-Cola 2L",16],["Água Mineral",6]]},{cat:"Sucos Naturais",ic:"fa-blender",cor:"var(--green)",items:[["Suco Acerola",6],["Suco Abacaxi",6],["Suco Cajá",6],["Suco Caju",6],["Suco Graviola",6],["Suco Morango",6],["Suco Uva",6]]},{cat:"Cervejas",ic:"fa-beer-mug-empty",cor:"var(--gold)",items:[["Skol 300ml",5],["Brahma 300ml",5],["Bohemia 300ml",5],["Original 300ml",5],["Budweiser Long Neck",null]]},{cat:"Bebidas & Destilados",ic:"fa-wine-glass",cor:"#8b0000",items:[["Black White (dose)",8],["Cavalo Branco (dose)",10],["Red Label (dose)",12],["Black Label (dose)",16],["Smirnoff",8],["Vinho Morgado (taça)",8],["Vinho Morgado (garrafa)",20]]}];
 const sizes=[{key:"P",slices:"4 fatias",price:28},{key:"M",slices:"6 fatias",price:36},{key:"G",slices:"8 fatias",price:46},{key:"F",slices:"12 fatias",price:56}];
 const bordas=["Sem borda","Catupiry","Cheddar","Chocolate"];
+const allFlavorNames=[...salgadas,...doces].map(p=>p[0]);
 
 const state={
   cart:[],
@@ -261,7 +275,7 @@ const state={
   addr:{rua:"",numero:"",bairro:"",ref:""},
   pagamento:"",troco:"",trocoCustom:"",
   obs:"",
-  modal:{name:"",size:"",price:0,borda:"Sem borda"}
+  modal:{name:"",size:"",price:0,borda:"Sem borda",isMeio:false,flavor2:""}
 };
 
 const money=v=>"R$ "+Number(v).toFixed(2).replace(".",","),escapeHtml=v=>String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),qs=s=>document.querySelector(s);
@@ -301,10 +315,40 @@ function renderSizeOptions(){
 }
 
 /* ---------- Size modal ---------- */
-function openSzModal(name){state.modal={name,size:"",price:0,borda:"Sem borda"};qs("#sz-pname").textContent=name;document.querySelectorAll(".sopt").forEach(i=>i.classList.remove("sel"));document.querySelectorAll(".bchip").forEach(i=>i.classList.toggle("sel",i.dataset.borda==="Sem borda"));updateSzPreview();qs("#sz-overlay").classList.add("open")}
+function populateMeioSecondSelect(excludeName){
+  const opts=allFlavorNames.filter(n=>n!==excludeName).map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  qs("#meio-second-select").innerHTML=`<option value="">Selecione o sabor...</option>`+opts;
+}
+function openSzModal(name){
+  state.modal={name,size:"",price:0,borda:"Sem borda",isMeio:false,flavor2:""};
+  qs("#sz-pname").textContent=name;
+  document.querySelectorAll(".sopt").forEach(i=>i.classList.remove("sel"));
+  document.querySelectorAll(".bchip").forEach(i=>i.classList.toggle("sel",i.dataset.borda==="Sem borda"));
+  qs("#meio-toggle-chk").checked=false;
+  qs("#meio-second-wrap").style.display="none";
+  populateMeioSecondSelect(name);
+  qs("#meio-second-select").value="";
+  updateSzPreview();
+  qs("#sz-overlay").classList.add("open");
+}
 function closeSzModal(){qs("#sz-overlay").classList.remove("open")}
-function updateSzPreview(){const extra=state.modal.borda==="Sem borda"?0:5,btn=qs("#btn-add-sz");if(!state.modal.size){qs("#sz-prev").textContent="Selecione um tamanho acima";btn.disabled=true;return}qs("#sz-prev").innerHTML=`Pizza <strong>${state.modal.size}</strong>${extra?` + Borda ${escapeHtml(state.modal.borda)}`:""} = <strong>${money(state.modal.price+extra)}</strong>`;btn.disabled=false}
-function confirmSz(){if(!state.modal.size)return;const extra=state.modal.borda==="Sem borda"?0:5,bordaTxt=extra?` (Borda ${state.modal.borda})`:"";addToCart(`${state.modal.name} - ${state.modal.size}${bordaTxt}`,state.modal.price+extra);closeSzModal()}
+function updateSzPreview(){
+  const extra=state.modal.borda==="Sem borda"?0:5,btn=qs("#btn-add-sz");
+  if(!state.modal.size){qs("#sz-prev").textContent="Selecione um tamanho acima";btn.disabled=true;return}
+  if(state.modal.isMeio&&!state.modal.flavor2){qs("#sz-prev").textContent="Escolha o segundo sabor da meio a meio";btn.disabled=true;return}
+  const label=state.modal.isMeio?`1/2 <strong>${escapeHtml(state.modal.name)}</strong> + 1/2 <strong>${escapeHtml(state.modal.flavor2)}</strong>`:`Pizza <strong>${state.modal.size}</strong>`;
+  const sizeTxt=state.modal.isMeio?` - Tamanho <strong>${state.modal.size}</strong>`:"";
+  qs("#sz-prev").innerHTML=`${label}${sizeTxt}${extra?` + Borda ${escapeHtml(state.modal.borda)}`:""} = <strong>${money(state.modal.price+extra)}</strong>`;
+  btn.disabled=false;
+}
+function confirmSz(){
+  if(!state.modal.size)return;
+  if(state.modal.isMeio&&!state.modal.flavor2)return;
+  const extra=state.modal.borda==="Sem borda"?0:5,bordaTxt=extra?` (Borda ${state.modal.borda})`:"";
+  const name=state.modal.isMeio?`1/2 ${state.modal.name} + 1/2 ${state.modal.flavor2} - ${state.modal.size}${bordaTxt}`:`${state.modal.name} - ${state.modal.size}${bordaTxt}`;
+  addToCart(name,state.modal.price+extra);
+  closeSzModal();
+}
 
 /* ---------- Cart ---------- */
 function addToCart(name,price){const cur=state.cart.find(i=>i.name===name);if(cur)cur.qty++;else state.cart.push({name,price:Number(price),qty:1});renderOrder();showToast("+ "+name.split(" - ")[0])}
@@ -481,6 +525,14 @@ function init(){
   renderSizeOptions();
   renderOrder();
   tickClock();setInterval(tickClock,15000);
+
+  qs("#meio-toggle-chk").addEventListener("change",e=>{
+    state.modal.isMeio=e.target.checked;
+    qs("#meio-second-wrap").style.display=state.modal.isMeio?"block":"none";
+    if(!state.modal.isMeio){state.modal.flavor2="";qs("#meio-second-select").value=""}
+    updateSzPreview();
+  });
+  qs("#meio-second-select").addEventListener("change",e=>{state.modal.flavor2=e.target.value;updateSzPreview()});
 
   document.addEventListener("click",e=>{
     const pizzaRow=e.target.closest(".item-row[data-pizza]");
