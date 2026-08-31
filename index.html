@@ -179,9 +179,9 @@ header{background:#fff;border-bottom:3px solid var(--red);box-shadow:0 2px 14px 
 @media(max-width:640px){.hd-inner{padding:12px 14px}.shell{padding:16px 14px 60px}.fl-row.addr2{grid-template-columns:1fr 70px}.size-grid{grid-template-columns:repeat(2,1fr)}.sz-overlay{padding:0;align-items:flex-end}.sz-modal{border-radius:16px 16px 0 0;max-height:88vh;max-height:88dvh}}
 
 @media print{
-  body *{visibility:hidden}
-  #print-area,#print-area *{visibility:visible}
-  #print-area{display:block;position:absolute;top:0;left:0;width:100%}
+  html,body{width:auto;height:auto;margin:0;padding:0;background:#fff}
+  .flag-stripe,header,.shell,.toast,.sz-overlay{display:none !important}
+  #print-area{display:block;position:static;width:auto}
   .receipt{display:none;margin:0 auto}
   body[data-print="cozinha"] #receipt-cozinha{display:block}
   body[data-print="cliente"] #receipt-cliente{display:block}
