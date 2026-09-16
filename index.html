@@ -97,6 +97,9 @@ header{background:#fff;border-bottom:3px solid var(--red);box-shadow:0 2px 14px 
 .cli-sugg-name{font-weight:800;font-size:.82rem;display:flex;align-items:center;gap:6px}
 .cli-sugg-meta{font-size:.7rem;color:var(--gray);margin-top:1px}
 .cli-sugg-badge{font-size:.55rem;background:var(--green);color:#fff;padding:2px 7px;border-radius:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.cli-sugg-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cli-sugg-del{border:0;background:transparent;color:var(--gray);width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:.65rem;flex:none;display:grid;place-items:center}
+.cli-sugg-del:hover{background:var(--red);color:#fff}
 
 .mode-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mopt{border:2px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;background:#fff}
@@ -318,6 +321,13 @@ function upsertCustomerFromState(){
   saveCustomersDb(db);
 }
 function findCustomerByPhoneExact(tel){const key=normalizePhone(tel);if(!key)return null;const db=customersDb();return db[key]||null}
+function deleteCustomer(tel){
+  const key=normalizePhone(tel);
+  if(!key)return;
+  const db=customersDb();
+  delete db[key];
+  saveCustomersDb(db);
+}
 function searchCustomers(term){
   const t=(term||"").trim().toLowerCase(),tDigits=normalizePhone(term);
   if(!t)return [];
@@ -331,7 +341,10 @@ function renderSuggestions(list){
   box.innerHTML=list.map(c=>{
     const end=[c.rua,c.numero].filter(Boolean).join(", ")+(c.bairro?" - "+c.bairro:"");
     return `<div class="cli-sugg-item" data-sugg-phone="${escapeHtml(c.telefone)}">
-      <div class="cli-sugg-name"><i class="fa-solid fa-user" style="color:var(--green);font-size:.7rem"></i> ${escapeHtml(c.nome)}<span class="cli-sugg-badge">Salvo</span></div>
+      <div class="cli-sugg-top">
+        <div class="cli-sugg-name"><i class="fa-solid fa-user" style="color:var(--green);font-size:.7rem"></i> ${escapeHtml(c.nome)}<span class="cli-sugg-badge">Salvo</span></div>
+        <button type="button" class="cli-sugg-del" data-del-phone="${escapeHtml(c.telefone)}" data-del-name="${escapeHtml(c.nome)}" title="Remover cliente salvo"><i class="fa-solid fa-xmark"></i></button>
+      </div>
       <div class="cli-sugg-meta">${escapeHtml(c.telefone)}${end.trim()?" · "+escapeHtml(end):""}</div>
     </div>`;
   }).join("");
@@ -674,6 +687,17 @@ function init(){
     if(e.target.closest("#btn-print-client")){printReceipt("cliente");return}
     if(e.target.closest("#btn-new-order")){newOrder();return}
     const suggItem=e.target.closest("[data-sugg-phone]");
+    const cliDelBtn=e.target.closest("[data-del-phone]");
+    if(cliDelBtn){
+      e.stopPropagation();
+      if(confirm(`Remover os dados salvos de "${cliDelBtn.dataset.delName}"?`)){
+        deleteCustomer(cliDelBtn.dataset.delPhone);
+        const inp=qs("#cli-nome-inp");
+        renderSuggestions(searchCustomers(inp?inp.value:""));
+        showToast("Cliente removido");
+      }
+      return;
+    }
     if(suggItem){selectCustomer(suggItem.dataset.suggPhone);return}
     if(!e.target.closest(".cli-field-wrap"))hideSuggestions();
   });
