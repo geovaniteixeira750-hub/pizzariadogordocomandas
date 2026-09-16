@@ -89,6 +89,14 @@ header{background:#fff;border-bottom:3px solid var(--red);box-shadow:0 2px 14px 
 .fl-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
 .fl-row.addr2{grid-template-columns:1fr 74px}
 .req{color:var(--red)}
+.cli-field-wrap{position:relative}
+.cli-suggestions{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--border);border-radius:8px;margin-top:4px;max-height:230px;overflow-y:auto;box-shadow:0 10px 26px #0002;z-index:80}
+.cli-sugg-item{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border)}
+.cli-sugg-item:last-child{border-bottom:0}
+.cli-sugg-item:hover{background:var(--cream)}
+.cli-sugg-name{font-weight:800;font-size:.82rem;display:flex;align-items:center;gap:6px}
+.cli-sugg-meta{font-size:.7rem;color:var(--gray);margin-top:1px}
+.cli-sugg-badge{font-size:.55rem;background:var(--green);color:#fff;padding:2px 7px;border-radius:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
 
 .mode-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mopt{border:2px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;background:#fff}
@@ -284,6 +292,50 @@ const state={
 
 const money=v=>"R$ "+Number(v).toFixed(2).replace(".",","),escapeHtml=v=>String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),qs=s=>document.querySelector(s);
 
+/* ---------- Clientes salvos (localStorage) ---------- */
+const CUSTOMERS_KEY="pizzaria_gordo_clientes_v1";
+function normalizePhone(v){return String(v||"").replace(/\D/g,"")}
+function customersDb(){try{return JSON.parse(localStorage.getItem(CUSTOMERS_KEY)||"{}")}catch(e){return {}}}
+function saveCustomersDb(db){try{localStorage.setItem(CUSTOMERS_KEY,JSON.stringify(db))}catch(e){}}
+function upsertCustomerFromState(){
+  const nome=(state.cliente.nome||"").trim(),tel=(state.cliente.telefone||"").trim();
+  const key=normalizePhone(tel);
+  if(!nome||!key)return;
+  const db=customersDb();
+  db[key]={nome,telefone:tel,rua:state.addr.rua||"",numero:state.addr.numero||"",bairro:state.addr.bairro||"",ref:state.addr.ref||"",updatedAt:Date.now()};
+  saveCustomersDb(db);
+}
+function findCustomerByPhoneExact(tel){const key=normalizePhone(tel);if(!key)return null;const db=customersDb();return db[key]||null}
+function searchCustomers(term){
+  const t=(term||"").trim().toLowerCase(),tDigits=normalizePhone(term);
+  if(!t)return [];
+  const db=customersDb();
+  return Object.values(db).filter(c=>c.nome.toLowerCase().includes(t)||(tDigits&&normalizePhone(c.telefone).includes(tDigits))).sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,6);
+}
+function renderSuggestions(list){
+  const box=qs("#cli-suggestions");
+  if(!box)return;
+  if(!list.length){box.style.display="none";box.innerHTML="";return}
+  box.innerHTML=list.map(c=>{
+    const end=[c.rua,c.numero].filter(Boolean).join(", ")+(c.bairro?" - "+c.bairro:"");
+    return `<div class="cli-sugg-item" data-sugg-phone="${escapeHtml(c.telefone)}">
+      <div class="cli-sugg-name"><i class="fa-solid fa-user" style="color:var(--green);font-size:.7rem"></i> ${escapeHtml(c.nome)}<span class="cli-sugg-badge">Salvo</span></div>
+      <div class="cli-sugg-meta">${escapeHtml(c.telefone)}${end.trim()?" · "+escapeHtml(end):""}</div>
+    </div>`;
+  }).join("");
+  box.style.display="block";
+}
+function hideSuggestions(){const box=qs("#cli-suggestions");if(box){box.style.display="none";box.innerHTML=""}}
+function selectCustomer(telefone){
+  const c=findCustomerByPhoneExact(telefone);
+  if(!c)return;
+  state.cliente.nome=c.nome;state.cliente.telefone=c.telefone;
+  state.addr.rua=c.rua||"";state.addr.numero=c.numero||"";state.addr.bairro=c.bairro||"";state.addr.ref=c.ref||"";
+  hideSuggestions();
+  renderOrder();
+  showToast("Cliente encontrado: "+c.nome);
+}
+
 /* ---------- Render menu ---------- */
 function renderItemList(list,containerId,isSweet){
   qs("#"+containerId).innerHTML=list.map(([name,desc,tag,tagClass])=>`
@@ -436,8 +488,11 @@ function renderOrder(){
     <div class="sec-block">
       <div class="sec-lbl"><i class="fa-solid fa-user"></i> Cliente (opcional)</div>
       <div class="fl-row">
-        <input class="fl-inp" data-cli="nome" type="text" placeholder="Nome" value="${escapeHtml(state.cliente.nome)}">
-        <input class="fl-inp" data-cli="telefone" type="text" placeholder="Telefone" value="${escapeHtml(state.cliente.telefone)}">
+        <div class="cli-field-wrap">
+          <input class="fl-inp" data-cli="nome" id="cli-nome-inp" type="text" autocomplete="off" placeholder="Nome" value="${escapeHtml(state.cliente.nome)}">
+          <div class="cli-suggestions" id="cli-suggestions" style="display:none"></div>
+        </div>
+        <input class="fl-inp" data-cli="telefone" id="cli-tel-inp" type="text" autocomplete="off" placeholder="Telefone" value="${escapeHtml(state.cliente.telefone)}">
       </div>
     </div>
 
@@ -539,6 +594,7 @@ function buildReceiptCliente(){
 
 function printReceipt(type){
   if(!state.cart.length){showToast("Adicione itens ao pedido antes de imprimir",true);return}
+  upsertCustomerFromState();
   if(type==="cliente"){
     if(!state.pagamento){showToast("Selecione a forma de pagamento",true);return}
     if(!isAddrOk()){showToast("Preencha o endereço de entrega",true);return}
@@ -605,13 +661,44 @@ function init(){
     if(e.target.closest("#btn-print-kitchen")){printReceipt("cozinha");return}
     if(e.target.closest("#btn-print-client")){printReceipt("cliente");return}
     if(e.target.closest("#btn-new-order")){newOrder();return}
+    const suggItem=e.target.closest("[data-sugg-phone]");
+    if(suggItem){selectCustomer(suggItem.dataset.suggPhone);return}
+    if(!e.target.closest(".cli-field-wrap"))hideSuggestions();
   });
 
   document.addEventListener("input",e=>{
-    if(e.target.matches("[data-cli]"))state.cliente[e.target.dataset.cli]=e.target.value;
+    if(e.target.matches("[data-cli]")){
+      state.cliente[e.target.dataset.cli]=e.target.value;
+      if(e.target.id==="cli-nome-inp")renderSuggestions(searchCustomers(e.target.value));
+    }
     if(e.target.matches("[data-addr]"))state.addr[e.target.dataset.addr]=e.target.value;
     if(e.target.id==="obs-inp")state.obs=e.target.value;
     if(e.target.id==="troco-custom")state.trocoCustom=e.target.value;
+  });
+
+  document.addEventListener("focusin",e=>{
+    if(e.target.id==="cli-nome-inp"&&e.target.value.trim())renderSuggestions(searchCustomers(e.target.value));
+  });
+
+  document.addEventListener("focusout",e=>{
+    if(e.target.id==="cli-nome-inp"){
+      setTimeout(hideSuggestions,150);
+      upsertCustomerFromState();
+    }
+    if(e.target.id==="cli-tel-inp"){
+      if(!state.cliente.nome.trim()){
+        const match=findCustomerByPhoneExact(e.target.value);
+        if(match){
+          state.cliente.nome=match.nome;state.cliente.telefone=match.telefone;
+          state.addr.rua=match.rua||"";state.addr.numero=match.numero||"";state.addr.bairro=match.bairro||"";state.addr.ref=match.ref||"";
+          renderOrder();
+          showToast("Cliente encontrado: "+match.nome);
+          return;
+        }
+      }
+      upsertCustomerFromState();
+    }
+    if(e.target.matches("[data-addr]"))upsertCustomerFromState();
   });
 
   qs("#sz-overlay").addEventListener("click",e=>{if(e.target.id==="sz-overlay")closeSzModal()});
