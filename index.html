@@ -292,6 +292,18 @@ const state={
 
 const money=v=>"R$ "+Number(v).toFixed(2).replace(".",","),escapeHtml=v=>String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),qs=s=>document.querySelector(s);
 
+function formatPhoneBR(raw){
+  const d=String(raw||"").replace(/\D/g,"").slice(0,11);
+  const len=d.length;
+  if(len===0)return "";
+  if(len<=2)return "("+d;
+  const ddd=d.slice(0,2),rest=d.slice(2);
+  if(len<=10){
+    return rest.length<=4?`(${ddd}) ${rest}`:`(${ddd}) ${rest.slice(0,4)}-${rest.slice(4)}`;
+  }
+  return `(${ddd}) ${rest.slice(0,5)}-${rest.slice(5)}`;
+}
+
 /* ---------- Clientes salvos (localStorage) ---------- */
 const CUSTOMERS_KEY="pizzaria_gordo_clientes_v1";
 function normalizePhone(v){return String(v||"").replace(/\D/g,"")}
@@ -480,7 +492,7 @@ function renderOrder(){
     <div class="troco-chips">
       ${[["nao","Não precisa"],["50","R$ 50"],["100","R$ 100"],["outro","Outro"]].map(([id,label])=>`<button class="tchip ${state.troco===id?"sel":""}" data-troco="${id}" type="button">${label}</button>`).join("")}
     </div>
-    ${state.troco==="outro"?`<div class="fl-row" style="margin-top:8px"><input class="fl-inp" id="troco-custom" type="number" inputmode="decimal" placeholder="Troco para R$" value="${escapeHtml(state.trocoCustom)}"></div>`:""}`:"";
+    ${state.troco==="outro"?`<div class="fl-row" style="margin-top:8px"><input class="fl-inp enter-nav" id="troco-custom" type="number" inputmode="decimal" placeholder="Troco para R$" value="${escapeHtml(state.trocoCustom)}"></div>`:""}`:"";
 
   body.innerHTML=`
     ${itemsHtml}
@@ -489,10 +501,10 @@ function renderOrder(){
       <div class="sec-lbl"><i class="fa-solid fa-user"></i> Cliente (opcional)</div>
       <div class="fl-row">
         <div class="cli-field-wrap">
-          <input class="fl-inp" data-cli="nome" id="cli-nome-inp" type="text" autocomplete="off" placeholder="Nome" value="${escapeHtml(state.cliente.nome)}">
+          <input class="fl-inp enter-nav" data-cli="nome" id="cli-nome-inp" type="text" autocomplete="off" placeholder="Nome" value="${escapeHtml(state.cliente.nome)}">
           <div class="cli-suggestions" id="cli-suggestions" style="display:none"></div>
         </div>
-        <input class="fl-inp" data-cli="telefone" id="cli-tel-inp" type="text" autocomplete="off" placeholder="Telefone" value="${escapeHtml(state.cliente.telefone)}">
+        <input class="fl-inp enter-nav" data-cli="telefone" id="cli-tel-inp" type="tel" inputmode="numeric" autocomplete="off" placeholder="(83) 99999-9999" maxlength="16" value="${escapeHtml(state.cliente.telefone)}">
       </div>
     </div>
 
@@ -502,14 +514,14 @@ function renderOrder(){
         <button class="mopt presencial ${state.modalidade==="presencial"?"sel presencial":""}" data-modo="presencial" type="button"><i class="fa-solid fa-store"></i><span class="mopt-lbl">Presencial</span></button>
         <button class="mopt delivery ${state.modalidade==="delivery"?"sel delivery":""}" data-modo="delivery" type="button"><i class="fa-solid fa-motorcycle"></i><span class="mopt-lbl">Delivery</span></button>
       </div>
-      ${state.modalidade==="presencial"?`<div style="margin-top:9px"><span class="fl-lbl">Mesa / Comanda</span><input class="fl-inp" data-cli="mesa" type="text" placeholder="Ex: Mesa 4" value="${escapeHtml(state.cliente.mesa)}"></div>`:`
+      ${state.modalidade==="presencial"?`<div style="margin-top:9px"><span class="fl-lbl">Mesa / Comanda</span><input class="fl-inp enter-nav" data-cli="mesa" type="text" placeholder="Ex: Mesa 4" value="${escapeHtml(state.cliente.mesa)}"></div>`:`
       <div style="margin-top:10px">
         <div class="fl-row addr2">
-          <div><span class="fl-lbl">Rua <span class="req">*</span></span><input class="fl-inp" data-addr="rua" type="text" placeholder="Rua" value="${escapeHtml(state.addr.rua)}"></div>
-          <div><span class="fl-lbl">Nº <span class="req">*</span></span><input class="fl-inp" data-addr="numero" type="text" placeholder="42" value="${escapeHtml(state.addr.numero)}"></div>
+          <div><span class="fl-lbl">Rua <span class="req">*</span></span><input class="fl-inp enter-nav" data-addr="rua" type="text" placeholder="Rua" value="${escapeHtml(state.addr.rua)}"></div>
+          <div><span class="fl-lbl">Nº <span class="req">*</span></span><input class="fl-inp enter-nav" data-addr="numero" type="text" placeholder="42" value="${escapeHtml(state.addr.numero)}"></div>
         </div>
-        <span class="fl-lbl">Bairro <span class="req">*</span></span><input class="fl-inp" data-addr="bairro" type="text" placeholder="Bairro" value="${escapeHtml(state.addr.bairro)}" style="margin-bottom:8px">
-        <span class="fl-lbl">Referência</span><input class="fl-inp" data-addr="ref" type="text" placeholder="Ponto de referência" value="${escapeHtml(state.addr.ref)}">
+        <span class="fl-lbl">Bairro <span class="req">*</span></span><input class="fl-inp enter-nav" data-addr="bairro" type="text" placeholder="Bairro" value="${escapeHtml(state.addr.bairro)}" style="margin-bottom:8px">
+        <span class="fl-lbl">Referência</span><input class="fl-inp enter-nav" data-addr="ref" type="text" placeholder="Ponto de referência" value="${escapeHtml(state.addr.ref)}">
       </div>`}
     </div>
 
@@ -668,12 +680,34 @@ function init(){
 
   document.addEventListener("input",e=>{
     if(e.target.matches("[data-cli]")){
-      state.cliente[e.target.dataset.cli]=e.target.value;
-      if(e.target.id==="cli-nome-inp")renderSuggestions(searchCustomers(e.target.value));
+      if(e.target.dataset.cli==="telefone"){
+        const formatted=formatPhoneBR(e.target.value);
+        if(formatted!==e.target.value)e.target.value=formatted;
+        state.cliente.telefone=formatted;
+      }else{
+        state.cliente[e.target.dataset.cli]=e.target.value;
+        if(e.target.id==="cli-nome-inp")renderSuggestions(searchCustomers(e.target.value));
+      }
     }
     if(e.target.matches("[data-addr]"))state.addr[e.target.dataset.addr]=e.target.value;
     if(e.target.id==="obs-inp")state.obs=e.target.value;
     if(e.target.id==="troco-custom")state.trocoCustom=e.target.value;
+  });
+
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Enter"&&e.target.matches(".enter-nav")){
+      e.preventDefault();
+      const all=Array.from(document.querySelectorAll(".enter-nav")).filter(el=>el.offsetParent!==null);
+      const idx=all.indexOf(e.target);
+      if(idx>-1&&idx<all.length-1){
+        const next=all[idx+1];
+        next.focus();
+        if(typeof next.select==="function")next.select();
+      }else{
+        const obs=qs("#obs-inp");
+        if(obs)obs.focus();
+      }
+    }
   });
 
   document.addEventListener("focusin",e=>{
